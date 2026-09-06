@@ -1985,7 +1985,7 @@ else:
             col_m1.metric("答对题数", f"{correct_count} / {total_q} 题")
             col_m2.metric("得分率", f"{score_pct:.1f}%")
             
-            is_passed = score_pct >= 70.0
+            is_passed = score_pct >= 50.0
             if is_passed:
                 col_m3.success("🏆 通过考试 (PASS)")
             else:
