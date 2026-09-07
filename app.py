@@ -246,10 +246,9 @@ QUESTIONS = [
       "C. All eligible VMs on the host are powered off",
       "D. All eligible VMs on the host are migrated to other hosts in the cluster"
     ],
-    "answer": "A, B, D",
+    "answer": "B, D",
     "explanation": "When an AHV host enters Maintenance Mode, eligible VMs are automatically live-migrated to other active hosts in the cluster, while non-migratable VMs (such as agent VMs or those with host affinity) are powered off.",
     "answer_clean": [
-      "A",
       "B",
       "D"
     ],
@@ -1758,17 +1757,44 @@ if not st.session_state.started:
             help="章节练习：做一题对一题并即时展示官方技术解析。模拟考试：在无即时反馈下连续答题，提交后统一生成错题本。"
         )
     with setup_col2:
-        num_questions = st.slider("❓ 抽取题目数量", min_value=5, max_value=len(QUESTIONS), value=20, help="默认抽取 20 道题，您可自由拖动滑块至最多 102 道全套题。")
-        shuffle_opt = st.checkbox("🔀 随机打乱题目顺序", value=True, help="开启后将随机打乱并随机抽取指定数量的题目；关闭则按题库序号顺序抽取。")
+        shuffle_opt = st.checkbox(
+            "🔀 随机打乱题目顺序", 
+            value=True, 
+            help="开启：打乱并随机抽取指定数量的题；关闭：可自定义选择顺序练习的题号区间（例如刷第20-50题）。"
+        )
+        if shuffle_opt:
+            num_questions = st.slider(
+                "❓ 随机抽取题目数量", 
+                min_value=5, 
+                max_value=len(QUESTIONS), 
+                value=20, 
+                help="默认抽取 20 道题，您可自由拖动滑块至最多 102 道全套题。"
+            )
+            range_opt = None
+        else:
+            range_opt = st.slider(
+                "🎯 选择顺序练习的题号范围（从第几题到第几题）",
+                min_value=1,
+                max_value=len(QUESTIONS),
+                value=(1, 20),
+                step=1,
+                help="指定您要按顺序练习的题号区间。例如选择 20 到 50，即可顺序刷第 20-50 题，不用每次从第一题开始。"
+            )
+            num_questions = range_opt[1] - range_opt[0] + 1
         
     st.markdown("---")
     start_btn = st.button("🚀 启动模拟系统 (Start Exam)", type="primary", use_container_width=True)
     
     if start_btn:
-        pool = list(range(len(QUESTIONS)))
         if shuffle_opt:
+            pool = list(range(len(QUESTIONS)))
             random.shuffle(pool)
-        st.session_state.quiz_pool = pool[:num_questions]
+            st.session_state.quiz_pool = pool[:num_questions]
+        else:
+            # 顺序抽取指定范围的题目
+            start_idx = range_opt[0] - 1  # 题号转为 0-based 索引
+            end_idx = range_opt[1]        # range_opt[1] 是包含的
+            st.session_state.quiz_pool = list(range(start_idx, end_idx))
         st.session_state.selected_mode = mode_select
         st.session_state.started = True
         st.session_state.current_index = 0
