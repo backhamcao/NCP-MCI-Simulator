@@ -42,7 +42,6 @@ streamlit run app.py
 .
 ├── app.py                         # Streamlit 应用、题库和交互逻辑
 ├── requirements.txt               # Python 依赖
-├── AGENTS.md                      # AI coding agent 工作说明
 └── .devcontainer/devcontainer.json # Python 3.11 开发容器配置
 ```
 
