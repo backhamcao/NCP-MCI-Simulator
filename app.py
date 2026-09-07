@@ -1729,15 +1729,15 @@ if query_progress:
         st.session_state.last_saved_progress = 1
 elif "last_saved_progress" not in st.session_state:
     st.session_state.last_saved_progress = 1
-    # 注入隐藏的 JS 脚本：如果本地 localStorage 存有进度，且 URL 中无 progress 参数，自动重定向父窗口以同步进度
+    # 注入隐藏的 JS 脚本：如果本地 localStorage 存有进度，且 iframe URL 中无 progress 参数，自动重定向当前 iframe 以同步进度 (绕过 CORS 限制)
     components_v5.html("""
     <script>
         try {
             const val = localStorage.getItem("ncp_mci_v4_progress");
-            if (val && !window.parent.location.search.includes("progress=")) {
-                const url = new URL(window.parent.location.href);
-                url.searchParams.set("progress", val);
-                window.parent.location.href = url.toString();
+            const urlParams = new URLSearchParams(window.location.search);
+            if (val && !urlParams.has("progress")) {
+                urlParams.set("progress", val);
+                window.location.search = urlParams.toString();
             }
         } catch (e) {
             console.error("读取本地进度失败:", e);
