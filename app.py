@@ -1701,7 +1701,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ── 初始化 Session State ──────────────────────────────────────────────────
+# ── 初始化 Session State & Cookie/LocalStorage 进度校验 ────────────────────────
 if 'started' not in st.session_state:
     st.session_state.started = False
 if 'current_index' not in st.session_state:
@@ -1718,6 +1718,32 @@ if 'practice_answered' not in st.session_state:
     st.session_state.practice_answered = set() # Set of indices answered in practice mode
 if 'selected_mode' not in st.session_state:
     st.session_state.selected_mode = "📝 章节练习 (Practice)"
+
+# 🆕 进度加载器：检测 URL 中的 progress 参数
+import streamlit.components.v1 as components_v5
+query_progress = st.query_params.get("progress")
+if query_progress:
+    try:
+        st.session_state.last_saved_progress = int(query_progress)
+    except ValueError:
+        st.session_state.last_saved_progress = 1
+elif "last_saved_progress" not in st.session_state:
+    st.session_state.last_saved_progress = 1
+    # 注入隐藏的 JS 脚本：如果本地 localStorage 存有进度，且 URL 中无 progress 参数，自动重定向父窗口以同步进度
+    components_v5.html("""
+    <script>
+        try {
+            const val = localStorage.getItem("ncp_mci_v4_progress");
+            if (val && !window.parent.location.search.includes("progress=")) {
+                const url = new URL(window.parent.location.href);
+                url.searchParams.set("progress", val);
+                window.parent.location.href = url.toString();
+            }
+        } catch (e) {
+            console.error("读取本地进度失败:", e);
+        }
+    </script>
+    """, height=0, width=0)
 
 # ── 导航与页面布局 ────────────────────────────────────────────────────────
 st.markdown("<h1 class='main-header'>🟢 Nutanix NCP-MCI v6.10 考试模拟器</h1>", unsafe_allow_html=True)
@@ -1760,7 +1786,7 @@ if not st.session_state.started:
         shuffle_opt = st.checkbox(
             "🔀 随机打乱题目顺序", 
             value=True, 
-            help="开启：打乱并随机抽取指定数量的题；关闭：可自定义选择顺序练习的题号区间（例如刷第20-50题）。"
+            help="开启：打乱并随机抽取指定数量的题；关闭：可自定义选择顺序练习的题号区间（例如刷第20-50题，系统已自动定位您上次的进度）。"
         )
         if shuffle_opt:
             num_questions = st.slider(
@@ -1772,20 +1798,47 @@ if not st.session_state.started:
             )
             range_opt = None
         else:
+            # 🆕 自动应用上次进度
+            default_start = st.session_state.get("last_saved_progress", 1)
+            default_start = max(1, min(default_start, len(QUESTIONS)))
+            default_end = min(default_start + 19, len(QUESTIONS))
+            if default_end < default_start:
+                default_end = len(QUESTIONS)
+                
             range_opt = st.slider(
                 "🎯 选择顺序练习的题号范围（从第几题到第几题）",
                 min_value=1,
                 max_value=len(QUESTIONS),
-                value=(1, 20),
+                value=(default_start, default_end),
                 step=1,
-                help="指定您要按顺序练习的题号区间。例如选择 20 到 50，即可顺序刷第 20-50 题，不用每次从第一题开始。"
+                help=f"指定您要按顺序练习的题号区间。系统已为您自动将起点设为上次结束进度：第 {default_start} 题。"
             )
             num_questions = range_opt[1] - range_opt[0] + 1
         
     st.markdown("---")
     start_btn = st.button("🚀 启动模拟系统 (Start Exam)", type="primary", use_container_width=True)
     
+    # 🆕 清除进度交互按钮
+    if st.session_state.get("last_saved_progress", 1) > 1:
+        st.write("")
+        reset_progress_btn = st.button("🧹 清除历史进度 (从第 1 题重新开始)", use_container_width=True)
+        if reset_progress_btn:
+            st.session_state.last_saved_progress = 1
+            st.query_params["progress"] = "1"
+            components_v5.html("""
+            <script>
+                try {
+                    localStorage.removeItem("ncp_mci_v4_progress");
+                } catch (e) {
+                    console.error("清除本地进度失败:", e);
+                }
+            </script>
+            """, height=0, width=0)
+            st.success("历史进度已清除，已恢复至第 1 题！")
+            st.rerun()
+            
     if start_btn:
+        st.session_state.shuffle_opt = shuffle_opt
         if shuffle_opt:
             pool = list(range(len(QUESTIONS)))
             random.shuffle(pool)
@@ -1802,12 +1855,35 @@ if not st.session_state.started:
         st.session_state.submitted = False
         st.session_state.practice_answered = set()
         st.session_state.score = 0
+        
+        # 🆕 如果是顺序练习，启动时自动在 URL 中打上进度标记
+        if mode_select == "📝 章节练习 (Practice)" and not shuffle_opt:
+            initial_q_num = st.session_state.quiz_pool[0] + 1
+            st.query_params["progress"] = str(initial_q_num)
+            
         st.rerun()
 else:
     mode = st.session_state.selected_mode
     pool_indices = st.session_state.quiz_pool
     current_q_idx = pool_indices[st.session_state.current_index]
     q_data = QUESTIONS[current_q_idx]
+    
+    # 🆕 自动保存进度到 Cookie/LocalStorage（仅在顺序章节练习模式下触发）
+    if mode == "📝 章节练习 (Practice)" and not st.session_state.get("shuffle_opt", True):
+        current_global_num = current_q_idx + 1
+        st.session_state.last_saved_progress = current_global_num
+        st.query_params["progress"] = str(current_global_num)
+        
+        # 写入浏览器 LocalStorage，防止会话丢失
+        components_v5.html(f"""
+        <script>
+            try {{
+                localStorage.setItem("ncp_mci_v4_progress", "{current_global_num}");
+            }} catch (e) {{
+                console.error("保存本地进度失败:", e);
+            }}
+        </script>
+        """, height=0, width=0)
     
     total_q = len(pool_indices)
     curr_num = st.session_state.current_index + 1
