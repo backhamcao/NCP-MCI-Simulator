@@ -1719,31 +1719,82 @@ if 'practice_answered' not in st.session_state:
 if 'selected_mode' not in st.session_state:
     st.session_state.selected_mode = "📝 章节练习 (Practice)"
 
-# 🆕 进度加载器：检测 URL 中的 progress 参数
-import streamlit.components.v1 as components_v5
-query_progress = st.query_params.get("progress")
-if query_progress:
-    try:
-        st.session_state.last_saved_progress = int(query_progress)
-    except ValueError:
-        st.session_state.last_saved_progress = 1
-elif "last_saved_progress" not in st.session_state:
-    st.session_state.last_saved_progress = 1
-    # 注入隐藏的 JS 脚本：如果本地 localStorage 存有进度，且 iframe URL 中无 progress 参数，自动重定向当前 iframe 以同步进度 (绕过 CORS 限制)
-    components_v5.html("""
-    <script>
-        try {
-            const val = localStorage.getItem("ncp_mci_v4_progress");
-            const urlParams = new URLSearchParams(window.location.search);
-            if (val && !urlParams.has("progress")) {
-                urlParams.set("progress", val);
-                window.location.search = urlParams.toString();
+# 🆕 自动化 LocalStorage 双向同步组件 (100% 免疫 CORS 与 Iframe 沙箱限制)
+import streamlit.components.v1 as components_v8
+import os
+
+component_dir = "./ls_component"
+os.makedirs(component_dir, exist_ok=True)
+index_path = os.path.join(component_dir, "index.html")
+
+html_code = """<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"></head>
+<body>
+<script>
+    function sendMessageToStreamlitClient(type, data) {
+        const outData = Object.assign({isStreamlitMessage: true, type: type}, data);
+        window.parent.postMessage(outData, "*");
+    }
+    sendMessageToStreamlitClient("streamlit:componentReady", {apiVersion: 1});
+    window.addEventListener("message", function(event) {
+        if (event.data.type === "streamlit:render") {
+            const args = event.data.args;
+            const save_val = args.save_val;
+            if (save_val !== undefined && save_val !== null) {
+                try {
+                    localStorage.setItem("ncp_mci_v8_progress", save_val);
+                } catch (e) {
+                    console.error("写入 localStorage 失败:", e);
+                }
             }
-        } catch (e) {
-            console.error("读取本地进度失败:", e);
+            try {
+                const val = localStorage.getItem("ncp_mci_v8_progress") || "1";
+                sendMessageToStreamlitClient("streamlit:setComponentValue", {value: val});
+            } catch (e) {
+                console.error("读取 localStorage 失败:", e);
+                sendMessageToStreamlitClient("streamlit:setComponentValue", {value: "1"});
+            }
+            sendMessageToStreamlitClient("streamlit:setFrameHeight", {height: 0});
         }
-    </script>
-    """, height=0, width=0)
+    });
+</script>
+</body>
+</html>
+"""
+
+with open(index_path, "w", encoding="utf-8") as f:
+  f.write(html_code)
+
+_ls_component = components_v8.declare_component("ls_component", path=component_dir)
+
+# 初始化 Session State 中的进度存储变量
+if "last_saved_progress" not in st.session_state:
+    st.session_state.last_saved_progress = 1
+if "progress_to_save" not in st.session_state:
+    st.session_state.progress_to_save = None
+
+def save_next_practice_question(question_number):
+  """Persist the next sequential practice question for the next visit."""
+  next_question = min(question_number + 2, len(QUESTIONS))
+  st.session_state.last_saved_progress = next_question
+  st.session_state.progress_to_save = str(next_question)
+
+# 调用双向同步组件
+try:
+    ls_val = _ls_component(save_val=st.session_state.progress_to_save, key="ls_sync_v8")
+    if ls_val is not None:
+        try:
+            val_int = int(ls_val)
+            if 1 <= val_int <= len(QUESTIONS):
+                st.session_state.last_saved_progress = val_int
+                # 如果当前保存操作已完成，清空临时暂存，避免重复写入
+                if st.session_state.progress_to_save == ls_val:
+                    st.session_state.progress_to_save = None
+        except ValueError:
+            pass
+except Exception as e:
+    pass
 
 # ── 导航与页面布局 ────────────────────────────────────────────────────────
 st.markdown("<h1 class='main-header'>🟢 Nutanix NCP-MCI v6.10 考试模拟器</h1>", unsafe_allow_html=True)
@@ -1824,16 +1875,7 @@ if not st.session_state.started:
         reset_progress_btn = st.button("🧹 清除历史进度 (从第 1 题重新开始)", use_container_width=True)
         if reset_progress_btn:
             st.session_state.last_saved_progress = 1
-            st.query_params["progress"] = "1"
-            components_v5.html("""
-            <script>
-                try {
-                    localStorage.removeItem("ncp_mci_v4_progress");
-                } catch (e) {
-                    console.error("清除本地进度失败:", e);
-                }
-            </script>
-            """, height=0, width=0)
+            st.session_state.progress_to_save = "1"
             st.success("历史进度已清除，已恢复至第 1 题！")
             st.rerun()
             
@@ -1856,34 +1898,12 @@ if not st.session_state.started:
         st.session_state.practice_answered = set()
         st.session_state.score = 0
         
-        # 🆕 如果是顺序练习，启动时自动在 URL 中打上进度标记
-        if mode_select == "📝 章节练习 (Practice)" and not shuffle_opt:
-            initial_q_num = st.session_state.quiz_pool[0] + 1
-            st.query_params["progress"] = str(initial_q_num)
-            
         st.rerun()
 else:
     mode = st.session_state.selected_mode
     pool_indices = st.session_state.quiz_pool
     current_q_idx = pool_indices[st.session_state.current_index]
     q_data = QUESTIONS[current_q_idx]
-    
-    # 🆕 自动保存进度到 Cookie/LocalStorage（仅在顺序章节练习模式下触发）
-    if mode == "📝 章节练习 (Practice)" and not st.session_state.get("shuffle_opt", True):
-        current_global_num = current_q_idx + 1
-        st.session_state.last_saved_progress = current_global_num
-        st.query_params["progress"] = str(current_global_num)
-        
-        # 写入浏览器 LocalStorage，防止会话丢失
-        components_v5.html(f"""
-        <script>
-            try {{
-                localStorage.setItem("ncp_mci_v4_progress", "{current_global_num}");
-            }} catch (e) {{
-                console.error("保存本地进度失败:", e);
-            }}
-        </script>
-        """, height=0, width=0)
     
     total_q = len(pool_indices)
     curr_num = st.session_state.current_index + 1
@@ -1948,6 +1968,8 @@ else:
             
         if submit_btn or is_answered:
             st.session_state.practice_answered.add(st.session_state.current_index)
+            if submit_btn and not st.session_state.get("shuffle_opt", True):
+                save_next_practice_question(current_q_idx)
             
             # 校验答案
             correct_set = set(q_data['answer_clean'])
@@ -1978,6 +2000,10 @@ else:
                 st.rerun()
         with nav_col2:
             if st.button("下一题 ➡️", disabled=st.session_state.current_index == total_q - 1, use_container_width=True):
+                if not st.session_state.current_index in st.session_state.practice_answered:
+                    st.session_state.practice_answered.add(st.session_state.current_index)
+                if not st.session_state.get("shuffle_opt", True):
+                    save_next_practice_question(current_q_idx)
                 st.session_state.current_index += 1
                 st.rerun()
                 

@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"></head>
+<body>
+<script>
+    function sendMessageToStreamlitClient(type, data) {
+        const outData = Object.assign({isStreamlitMessage: true, type: type}, data);
+        window.parent.postMessage(outData, "*");
+    }
+    sendMessageToStreamlitClient("streamlit:componentReady", {apiVersion: 1});
+    window.addEventListener("message", function(event) {
+        if (event.data.type === "streamlit:render") {
+            const args = event.data.args;
+            const save_val = args.save_val;
+            if (save_val !== undefined && save_val !== null) {
+                try {
+                    localStorage.setItem("ncp_mci_v8_progress", save_val);
+                } catch (e) {
+                    console.error("写入 localStorage 失败:", e);
+                }
+            }
+            try {
+                const val = localStorage.getItem("ncp_mci_v8_progress") || "1";
+                sendMessageToStreamlitClient("streamlit:setComponentValue", {value: val});
+            } catch (e) {
+                console.error("读取 localStorage 失败:", e);
+                sendMessageToStreamlitClient("streamlit:setComponentValue", {value: "1"});
+            }
+            sendMessageToStreamlitClient("streamlit:setFrameHeight", {height: 0});
+        }
+    });
+</script>
+</body>
+</html>
