@@ -1741,6 +1741,7 @@ html_code = """<!DOCTYPE html>
         if (event.data.type === "streamlit:render") {
             const args = event.data.args;
             const save_val = args.save_val;
+            const save_wrong_ids = args.save_wrong_ids;
             if (save_val !== undefined && save_val !== null) {
                 try {
                     localStorage.setItem("ncp_mci_v8_progress", save_val);
@@ -1748,12 +1749,24 @@ html_code = """<!DOCTYPE html>
                     console.error("写入 localStorage 失败:", e);
                 }
             }
+              if (save_wrong_ids !== undefined && save_wrong_ids !== null) {
+                try {
+                  localStorage.setItem("ncp_mci_v8_wrong_questions", save_wrong_ids);
+                } catch (e) {
+                  console.error("写入错题本失败:", e);
+                }
+              }
             try {
                 const val = localStorage.getItem("ncp_mci_v8_progress") || "1";
-                sendMessageToStreamlitClient("streamlit:setComponentValue", {value: val});
+                const wrongIds = localStorage.getItem("ncp_mci_v8_wrong_questions") || "[]";
+                sendMessageToStreamlitClient("streamlit:setComponentValue", {
+                  value: JSON.stringify({progress: val, wrong_ids: JSON.parse(wrongIds)})
+                });
             } catch (e) {
                 console.error("读取 localStorage 失败:", e);
-                sendMessageToStreamlitClient("streamlit:setComponentValue", {value: "1"});
+                sendMessageToStreamlitClient("streamlit:setComponentValue", {
+                  value: JSON.stringify({progress: "1", wrong_ids: []})
+                });
             }
             sendMessageToStreamlitClient("streamlit:setFrameHeight", {height: 0});
         }
@@ -1773,6 +1786,23 @@ if "last_saved_progress" not in st.session_state:
     st.session_state.last_saved_progress = 1
 if "progress_to_save" not in st.session_state:
     st.session_state.progress_to_save = None
+if "wrong_question_ids" not in st.session_state:
+  st.session_state.wrong_question_ids = set()
+if "wrong_ids_to_save" not in st.session_state:
+  st.session_state.wrong_ids_to_save = None
+
+def sync_range_from_inputs():
+  """Update the slider after both text inputs contain a valid range."""
+  start = st.session_state.get("range_start_input", "")
+  end = st.session_state.get("range_end_input", "")
+  if start.isdigit() and end.isdigit() and int(start) <= int(end):
+    st.session_state.range_slider = (int(start), int(end))
+
+def sync_inputs_from_range():
+  """Copy the selected slider range into the two number inputs."""
+  start, end = st.session_state.range_slider
+  st.session_state.range_start_input = str(start)
+  st.session_state.range_end_input = str(end)
 
 def save_next_practice_question(question_number):
   """Persist the next sequential practice question for the next visit."""
@@ -1780,18 +1810,45 @@ def save_next_practice_question(question_number):
   st.session_state.last_saved_progress = next_question
   st.session_state.progress_to_save = str(next_question)
 
+def queue_wrong_question(question_number):
+  """Add a question to the persistent wrong-answer collection."""
+  st.session_state.wrong_question_ids.add(int(question_number))
+  st.session_state.wrong_ids_to_save = json.dumps(
+      sorted(st.session_state.wrong_question_ids)
+  )
+
+def clear_wrong_questions():
+  st.session_state.wrong_question_ids = set()
+  st.session_state.wrong_ids_to_save = "[]"
+
 # 调用双向同步组件
 try:
-    ls_val = _ls_component(save_val=st.session_state.progress_to_save, key="ls_sync_v8")
+    ls_val = _ls_component(
+      save_val=st.session_state.progress_to_save,
+      save_wrong_ids=st.session_state.wrong_ids_to_save,
+      key="ls_sync_v8"
+    )
     if ls_val is not None:
         try:
-            val_int = int(ls_val)
+            sync_data = json.loads(ls_val)
+            if isinstance(sync_data, int):
+                sync_data = {"progress": sync_data, "wrong_ids": []}
+            val_int = int(sync_data.get("progress", 1))
             if 1 <= val_int <= len(QUESTIONS):
                 st.session_state.last_saved_progress = val_int
                 # 如果当前保存操作已完成，清空临时暂存，避免重复写入
-                if st.session_state.progress_to_save == ls_val:
+                if st.session_state.progress_to_save == str(val_int):
                     st.session_state.progress_to_save = None
-        except ValueError:
+            wrong_ids = {
+                int(question_number)
+                for question_number in sync_data.get("wrong_ids", [])
+                if 1 <= int(question_number) <= len(QUESTIONS)
+            }
+            if not st.session_state.wrong_question_ids:
+                st.session_state.wrong_question_ids = wrong_ids
+            if st.session_state.wrong_ids_to_save == json.dumps(sorted(wrong_ids)):
+                st.session_state.wrong_ids_to_save = None
+        except (TypeError, ValueError, json.JSONDecodeError):
             pass
 except Exception as e:
     pass
@@ -1855,19 +1912,90 @@ if not st.session_state.started:
             default_end = min(default_start + 19, len(QUESTIONS))
             if default_end < default_start:
                 default_end = len(QUESTIONS)
-                
+
+            if "range_start_input" not in st.session_state:
+                st.session_state.range_start_input = str(default_start)
+            if "range_end_input" not in st.session_state:
+                st.session_state.range_end_input = str(default_end)
+            if "range_slider" not in st.session_state:
+                st.session_state.range_slider = (default_start, default_end)
+
+            range_input_col1, range_input_col2 = st.columns(2)
+            with range_input_col1:
+                st.text_input(
+                    "🎯 起始题号",
+                    key="range_start_input",
+                  on_change=sync_range_from_inputs,
+                    help="请输入顺序练习的起始题号。"
+                )
+            with range_input_col2:
+                st.text_input(
+                    "🏁 结束题号",
+                    key="range_end_input",
+                  on_change=sync_range_from_inputs,
+                    help="请输入顺序练习的结束题号。"
+                )
+
             range_opt = st.slider(
                 "🎯 选择顺序练习的题号范围（从第几题到第几题）",
                 min_value=1,
                 max_value=len(QUESTIONS),
-                value=(default_start, default_end),
+                value=st.session_state.range_slider,
                 step=1,
+                key="range_slider",
+                on_change=sync_inputs_from_range,
                 help=f"指定您要按顺序练习的题号区间。系统已为您自动将起点设为上次结束进度：第 {default_start} 题。"
             )
-            num_questions = range_opt[1] - range_opt[0] + 1
+
+            range_start = st.session_state.get("range_start_input")
+            range_end = st.session_state.get("range_end_input")
+            range_error = None
+            if not range_start or not range_end:
+                range_error = "起始题号和结束题号不能为空。"
+            elif not range_start.isdigit() or not range_end.isdigit():
+                range_error = "题号只能输入数字。"
+            else:
+                range_start = int(range_start)
+                range_end = int(range_end)
+            if range_error is None and (not 1 <= range_start <= len(QUESTIONS) or not 1 <= range_end <= len(QUESTIONS)):
+                range_error = f"题号必须在 1 到 {len(QUESTIONS)} 之间。"
+            elif range_error is None and range_start > range_end:
+                range_error = "起始题号不能大于结束题号。"
+
+            if range_error:
+              st.warning(f"⚠️ {range_error}")
+              range_opt = None
+              num_questions = 0
+            else:
+              range_opt = (range_start, range_end)
+              num_questions = range_end - range_start + 1
         
     st.markdown("---")
-    start_btn = st.button("🚀 启动模拟系统 (Start Exam)", type="primary", use_container_width=True)
+    wrong_count = len(st.session_state.wrong_question_ids)
+    if wrong_count:
+      st.info(f"📚 当前错题本共有 {wrong_count} 道题。错题记录保存在本浏览器中。")
+      wrong_col1, wrong_col2 = st.columns([2, 1])
+      with wrong_col1:
+        wrong_practice_btn = st.button(
+          "🎯 练习错题",
+          type="secondary",
+          use_container_width=True,
+        )
+      with wrong_col2:
+        clear_wrong_btn = st.button("🧹 清空错题本", use_container_width=True)
+      if clear_wrong_btn:
+        clear_wrong_questions()
+        st.success("错题本已清空。")
+        st.rerun()
+    else:
+      wrong_practice_btn = False
+
+    start_btn = st.button(
+      "🚀 启动模拟系统 (Start Exam)",
+      type="primary",
+      use_container_width=True,
+      disabled=not shuffle_opt and range_opt is None,
+    )
     
     # 🆕 清除进度交互按钮
     if st.session_state.get("last_saved_progress", 1) > 1:
@@ -1879,9 +2007,15 @@ if not st.session_state.started:
             st.success("历史进度已清除，已恢复至第 1 题！")
             st.rerun()
             
-    if start_btn:
+    if start_btn or wrong_practice_btn:
         st.session_state.shuffle_opt = shuffle_opt
-        if shuffle_opt:
+        if wrong_practice_btn:
+            st.session_state.quiz_pool = [
+                index for index, question in enumerate(QUESTIONS)
+                if question["num"] in st.session_state.wrong_question_ids
+            ]
+            st.session_state.selected_mode = "📝 章节练习 (Practice)"
+        elif shuffle_opt:
             pool = list(range(len(QUESTIONS)))
             random.shuffle(pool)
             st.session_state.quiz_pool = pool[:num_questions]
@@ -1890,7 +2024,7 @@ if not st.session_state.started:
             start_idx = range_opt[0] - 1  # 题号转为 0-based 索引
             end_idx = range_opt[1]        # range_opt[1] 是包含的
             st.session_state.quiz_pool = list(range(start_idx, end_idx))
-        st.session_state.selected_mode = mode_select
+            st.session_state.selected_mode = mode_select
         st.session_state.started = True
         st.session_state.current_index = 0
         st.session_state.user_answers = {}
@@ -1980,6 +2114,7 @@ else:
             if user_set == correct_set:
                 st.success(f"🎉 恭喜！回答正确！(正确答案：{correct_str})")
             else:
+                queue_wrong_question(q_data["num"])
                 user_str = ", ".join(user_set) if user_set else "未作答"
                 st.error(f"❌ 回答错误。您的选择：{user_str} | 正确答案：{correct_str}")
                 
@@ -2096,6 +2231,7 @@ else:
                 if user_ans == correct_ans:
                     correct_count += 1
                 else:
+                    queue_wrong_question(orig_q["num"])
                     wrong_list.append({
                         "num_label": idx + 1,
                         "orig_num": orig_q['num'],

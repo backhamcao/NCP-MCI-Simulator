@@ -12,6 +12,7 @@
         if (event.data.type === "streamlit:render") {
             const args = event.data.args;
             const save_val = args.save_val;
+            const save_wrong_ids = args.save_wrong_ids;
             if (save_val !== undefined && save_val !== null) {
                 try {
                     localStorage.setItem("ncp_mci_v8_progress", save_val);
@@ -19,12 +20,24 @@
                     console.error("写入 localStorage 失败:", e);
                 }
             }
+              if (save_wrong_ids !== undefined && save_wrong_ids !== null) {
+                try {
+                  localStorage.setItem("ncp_mci_v8_wrong_questions", save_wrong_ids);
+                } catch (e) {
+                  console.error("写入错题本失败:", e);
+                }
+              }
             try {
                 const val = localStorage.getItem("ncp_mci_v8_progress") || "1";
-                sendMessageToStreamlitClient("streamlit:setComponentValue", {value: val});
+                const wrongIds = localStorage.getItem("ncp_mci_v8_wrong_questions") || "[]";
+                sendMessageToStreamlitClient("streamlit:setComponentValue", {
+                  value: JSON.stringify({progress: val, wrong_ids: JSON.parse(wrongIds)})
+                });
             } catch (e) {
                 console.error("读取 localStorage 失败:", e);
-                sendMessageToStreamlitClient("streamlit:setComponentValue", {value: "1"});
+                sendMessageToStreamlitClient("streamlit:setComponentValue", {
+                  value: JSON.stringify({progress: "1", wrong_ids: []})
+                });
             }
             sendMessageToStreamlitClient("streamlit:setFrameHeight", {height: 0});
         }
