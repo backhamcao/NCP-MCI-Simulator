@@ -1663,41 +1663,551 @@ QUESTIONS = [
   }
 ]
 
-# ── 样式定制 ─────────────────────────────────────────────────────────────
+# ── Gemini 风格设计系统 ─────────────────────────────────────────────────────
 st.markdown("""
 <style>
-    .main-header {
-        color: #002B49;
-        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-        font-weight: 800;
-        margin-bottom: 5px;
-    }
-    .sub-header {
-        color: #2CBA00;
-        font-weight: 600;
-        margin-bottom: 25px;
-    }
-    .q-card {
-        background-color: #f8f9fa;
-        padding: 20px;
-        border-radius: 8px;
-        border-left: 5px solid #002B49;
-        margin-bottom: 20px;
-    }
-    .opt-card {
-        padding: 10px 15px;
-        background-color: #ffffff;
-        border: 1px solid #e9ecef;
-        border-radius: 5px;
-        margin-bottom: 8px;
-    }
-    .explanation-box {
-        background-color: #fafdf6;
-        border-left: 5px solid #2CBA00;
-        padding: 15px;
-        border-radius: 5px;
-        margin-top: 15px;
-    }
+/* ── Design Tokens (CSS 变量) ─────────────────────────────────────────── */
+:root {
+  /* 品牌色 - Gemini 渐变 */
+  --gemini-blue: #4285F4;
+  --gemini-blue-dark: #1A73E8;
+  --gemini-purple: #A142F4;
+  --gemini-pink: #EE4C93;
+  --gemini-gradient: linear-gradient(135deg, #4285F4 0%, #A142F4 50%, #EE4C93 100%);
+  --gemini-gradient-subtle: linear-gradient(135deg, rgba(66,133,244,0.08) 0%, rgba(161,66,244,0.08) 50%, rgba(238,76,147,0.08) 100%);
+
+  /* 文字色 */
+  --text-primary: #1F1F1F;
+  --text-secondary: #5F6368;
+  --text-tertiary: #80868B;
+
+  /* 背景色 */
+  --bg-primary: #FFFFFF;
+  --bg-secondary: #F0F4F9;
+  --bg-tertiary: #F8F9FA;
+  --bg-card: #F0F4F9;
+
+  /* 边框与阴影 */
+  --border-color: #E0E0E0;
+  --border-light: #EDEDF0;
+  --shadow-sm: 0 1px 2px 0 rgba(60,64,67,0.05), 0 1px 3px 1px rgba(60,64,67,0.05);
+  --shadow-md: 0 1px 3px 0 rgba(60,64,67,0.1), 0 4px 8px 3px rgba(60,64,67,0.05);
+  --shadow-lg: 0 4px 6px 2px rgba(60,64,67,0.08), 0 8px 16px 4px rgba(60,64,67,0.08);
+
+  /* 圆角 */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+
+  /* 字体 */
+  --font-sans: "Google Sans", "Product Sans", Roboto, -apple-system, "Segoe UI", sans-serif;
+  --font-text: "Google Sans Text", Roboto, -apple-system, "Segoe UI", sans-serif;
+
+  /* 动效 */
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --duration-slow: 350ms;
+}
+
+/* ── 强制锁定浅色模式 (覆盖系统深色偏好) ────────────────────────────── */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --text-primary: #1F1F1F;
+    --text-secondary: #5F6368;
+    --text-tertiary: #80868B;
+    --bg-primary: #FFFFFF;
+    --bg-secondary: #F0F4F9;
+    --bg-tertiary: #F8F9FA;
+    --bg-card: #F0F4F9;
+    --border-color: #E0E0E0;
+    --border-light: #EDEDF0;
+  }
+  /* 强制 Streamlit 容器背景为白色 */
+  .stApp, [data-testid="stAppViewContainer"], .main .block-container {
+    background-color: #FFFFFF !important;
+    color: #1F1F1F !important;
+  }
+}
+
+/* ── 全局基础重置 ─────────────────────────────────────────────────────── */
+.stApp {
+  font-family: var(--font-text) !important;
+  color: var(--text-primary);
+}
+
+.main .block-container {
+  max-width: 860px;
+  padding-top: 2.5rem;
+  padding-bottom: 3rem;
+}
+
+/* ── 淡入动画 ────────────────────────────────────────────────────────── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── 品牌渐变呼吸动画 (加载/思考状态) ───────────────────────────────── */
+@keyframes gradientShift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* ── 主标题 ───────────────────────────────────────────────────────────── */
+.main-header {
+  font-family: var(--font-sans) !important;
+  font-weight: 600 !important;
+  font-size: 2rem !important;
+  color: var(--text-primary) !important;
+  margin-bottom: 4px !important;
+  letter-spacing: -0.02em;
+  animation: fadeInUp var(--duration-normal) var(--ease-out) both;
+}
+
+/* ── 副标题 ───────────────────────────────────────────────────────────── */
+.sub-header {
+  font-family: var(--font-text) !important;
+  font-weight: 400 !important;
+  font-size: 1rem !important;
+  color: var(--text-secondary) !important;
+  margin-bottom: 2rem !important;
+  letter-spacing: -0.01em;
+  animation: fadeInUp var(--duration-normal) var(--ease-out) 0.08s both;
+}
+
+/* ── 题目卡片 ─────────────────────────────────────────────────────────── */
+.q-card {
+  background: var(--bg-card);
+  padding: 24px 28px;
+  border-radius: var(--radius-lg);
+  border: none;
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 24px;
+  position: relative;
+  overflow: hidden;
+  animation: fadeInUp var(--duration-normal) var(--ease-out) both;
+}
+
+.q-card::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0;
+  width: 4px; height: 100%;
+  background: var(--gemini-gradient);
+  border-radius: var(--radius-lg) 0 0 var(--radius-lg);
+}
+
+.q-card b {
+  font-family: var(--font-sans);
+  font-weight: 500;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--gemini-blue-dark);
+}
+
+/* ── 选项卡片 (保留用于自定义渲染场景) ──────────────────────────────── */
+.opt-card {
+  padding: 12px 18px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  margin-bottom: 8px;
+  transition: box-shadow var(--duration-fast) var(--ease-out),
+              border-color var(--duration-fast) var(--ease-out);
+}
+
+.opt-card:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--gemini-blue);
+}
+
+/* ── 解析区域 ─────────────────────────────────────────────────────────── */
+.explanation-box {
+  background: linear-gradient(135deg, rgba(66,133,244,0.04) 0%, rgba(161,66,244,0.04) 100%);
+  border: 1px solid rgba(66,133,244,0.12);
+  border-left: 4px solid var(--gemini-blue);
+  padding: 20px 24px;
+  border-radius: var(--radius-md);
+  margin-top: 20px;
+  animation: fadeInUp var(--duration-normal) var(--ease-out) both;
+}
+
+.explanation-box h5,
+.explanation-box h6 {
+  font-family: var(--font-sans) !important;
+  font-weight: 500 !important;
+  font-size: 0.95rem !important;
+  color: var(--gemini-blue-dark) !important;
+  margin: 0 0 10px 0 !important;
+}
+
+.explanation-box p {
+  font-family: var(--font-text);
+  font-size: 0.925rem;
+  line-height: 1.65;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+/* ── Streamlit 原生组件覆盖 ────────────────────────────────────────────── */
+
+/* 按钮 - 胶囊形 */
+.stButton > button {
+  font-family: var(--font-sans) !important;
+  font-weight: 500 !important;
+  font-size: 0.9rem !important;
+  border-radius: var(--radius-pill) !important;
+  padding: 10px 28px !important;
+  border: none !important;
+  transition: all var(--duration-fast) var(--ease-out) !important;
+  letter-spacing: -0.01em;
+}
+
+.stButton > button:hover {
+  transform: scale(1.015);
+  box-shadow: var(--shadow-md) !important;
+}
+
+.stButton > button:active {
+  transform: scale(0.98);
+}
+
+/* Primary 按钮 */
+.stButton > button[kind="primary"],
+.stButton > button[data-testid="stBaseButton-primary"] {
+  background: var(--gemini-gradient) !important;
+  background-size: 200% 200% !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 2px 8px rgba(66,133,244,0.25) !important;
+}
+
+.stButton > button[kind="primary"]:hover,
+.stButton > button[data-testid="stBaseButton-primary"]:hover {
+  box-shadow: 0 4px 16px rgba(66,133,244,0.35) !important;
+}
+
+/* Secondary 按钮 */
+.stButton > button[kind="secondary"],
+.stButton > button[data-testid="stBaseButton-secondary"] {
+  background: var(--bg-card) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-color) !important;
+}
+
+.stButton > button[kind="secondary"]:hover,
+.stButton > button[data-testid="stBaseButton-secondary"]:hover {
+  border-color: var(--gemini-blue) !important;
+  background: #FFFFFF !important;
+}
+
+/* Radio / Checkbox 选项样式 */
+.stRadio > div > label,
+.stCheckbox > label {
+  font-family: var(--font-text) !important;
+  font-size: 0.925rem !important;
+  color: var(--text-primary) !important;
+  padding: 6px 0 !important;
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.stRadio > div > label:hover,
+.stCheckbox > label:hover {
+  color: var(--gemini-blue-dark) !important;
+}
+
+/* Radio 选中指示器 - Gemini 蓝色 */
+.stRadio > div > label[data-checked="true"] > div:first-child > div {
+  border-color: var(--gemini-blue) !important;
+  background-color: var(--gemini-blue) !important;
+}
+
+/* 输入框 */
+.stTextInput > div > div > input {
+  font-family: var(--font-text) !important;
+  border-radius: var(--radius-md) !important;
+  border: 1px solid var(--border-color) !important;
+  background: var(--bg-card) !important;
+  padding: 10px 16px !important;
+  font-size: 0.925rem !important;
+  transition: border-color var(--duration-fast) var(--ease-out),
+              box-shadow var(--duration-fast) var(--ease-out) !important;
+}
+
+.stTextInput > div > div > input:focus {
+  border-color: var(--gemini-blue) !important;
+  box-shadow: 0 0 0 2px rgba(66,133,244,0.15) !important;
+  outline: none !important;
+  border-radius: var(--radius-md) !important;
+}
+
+/* 输入框外层容器圆角保持 */
+.stTextInput > div > div {
+  border-radius: var(--radius-md) !important;
+  overflow: hidden !important;
+}
+
+.stTextInput > div > div:focus-within {
+  border-color: var(--gemini-blue) !important;
+  box-shadow: 0 0 0 2px rgba(66,133,244,0.15) !important;
+  outline: none !important;
+  border-radius: var(--radius-md) !important;
+}
+
+/* Slider 轨道 */
+.stSlider > div > div > div > div {
+  background: var(--gemini-blue) !important;
+}
+
+/* Slider 两端 min/max 刻度标签 */
+[data-testid="stSliderTickBar"] {
+  background-color: transparent !important;
+}
+
+[data-testid="stSliderTickBar"] > [data-testid="stMarkdownContainer"] {
+  background-color: #E8F0FE !important;
+  color: var(--gemini-blue-dark) !important;
+}
+
+/*
+ * Slider thumb 数值气泡修复
+ *
+ * 从 Slider.Bo8eChlk.js 编译产物确认:
+ *   - data-testid="stSliderThumbValue" 存在于 JSX
+ *   - emotion target = efbyxod4, 实际 DOM class = css-efbyxod4 或 e-efbyxod4
+ *   - emotion 内联: backgroundColor: transparent, color: primary
+ *   - 深蓝背景来自父元素 StyledThumb (efbyxod3, backgroundColor: primary)
+ *
+ * 多策略选择器确保命中
+ */
+
+/* 1. data-testid (源码确认存在) */
+.stSlider [data-testid="stSliderThumbValue"] {
+  background-color: #E8F0FE !important;
+  color: #1A73E8 !important;
+}
+
+/* 2. emotion class: css-efbyxod4 */
+.stSlider [class*="efbyxod4"] {
+  background-color: #E8F0FE !important;
+  color: #1A73E8 !important;
+}
+
+/* 3. 所有子元素文字色 */
+.stSlider [data-testid="stSliderThumbValue"] *,
+.stSlider [class*="efbyxod4"] * {
+  color: #1A73E8 !important;
+}
+
+/* Metric 卡片 */
+.stMetric {
+  background: var(--bg-card);
+  padding: 20px 24px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  animation: fadeInUp var(--duration-normal) var(--ease-out) both;
+}
+
+.stMetric > div > div:first-child {
+  font-family: var(--font-text) !important;
+  font-size: 0.85rem !important;
+  color: var(--text-secondary) !important;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.stMetric > div > div:last-child {
+  font-family: var(--font-sans) !important;
+  font-weight: 600 !important;
+  font-size: 1.6rem !important;
+  color: var(--text-primary) !important;
+}
+
+/* Expander */
+.streamlit-expanderHeader {
+  font-family: var(--font-sans) !important;
+  font-weight: 500 !important;
+  font-size: 0.95rem !important;
+  color: var(--text-primary) !important;
+  border-radius: var(--radius-md) !important;
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border-light) !important;
+  padding: 14px 20px !important;
+  transition: box-shadow var(--duration-fast) var(--ease-out) !important;
+}
+
+.streamlit-expanderHeader:hover {
+  box-shadow: var(--shadow-sm) !important;
+}
+
+.streamlit-expanderContent {
+  border: 1px solid var(--border-light) !important;
+  border-top: none !important;
+  border-radius: 0 0 var(--radius-md) var(--radius-md) !important;
+  background: var(--bg-primary) !important;
+  padding: 20px !important;
+}
+
+/* Info / Warning / Success / Error 提示框 */
+.stAlert {
+  border-radius: var(--radius-md) !important;
+  font-family: var(--font-text) !important;
+  font-size: 0.9rem !important;
+  padding: 14px 20px !important;
+  border: none !important;
+}
+
+/* 侧边栏 */
+[data-testid="stSidebar"] {
+  background: var(--bg-tertiary) !important;
+  border-right: 1px solid var(--border-light) !important;
+}
+
+[data-testid="stSidebar"] .stMarkdown p,
+[data-testid="stSidebar"] .stMarkdown li {
+  font-family: var(--font-text) !important;
+  font-size: 0.875rem !important;
+  color: var(--text-secondary) !important;
+}
+
+/* 分割线 */
+hr {
+  border: none !important;
+  border-top: 1px solid var(--border-light) !important;
+  margin: 1.5rem 0 !important;
+}
+
+/* 进度条 */
+.stProgress > div > div > div {
+  background: var(--gemini-gradient) !important;
+  background-size: 200% 200% !important;
+  animation: gradientShift 3s ease infinite !important;
+  border-radius: var(--radius-pill) !important;
+}
+
+.stProgress > div > div {
+  background: var(--bg-card) !important;
+  border-radius: var(--radius-pill) !important;
+  overflow: hidden !important;
+}
+
+/* 答题卡跳转按钮网格 */
+div[data-testid="stHorizontalBlock"] .stButton > button,
+div[data-testid="stHorizontalBlock"] .stButton > button[kind="primary"],
+div[data-testid="stHorizontalBlock"] .stButton > button[kind="secondary"],
+div[data-testid="stHorizontalBlock"] .stButton > button[data-testid="stBaseButton-primary"],
+div[data-testid="stHorizontalBlock"] .stButton > button[data-testid="stBaseButton-secondary"] {
+  min-width: 42px !important;
+  padding: 8px 4px !important;
+  font-size: 0.825rem !important;
+  font-weight: 500 !important;
+  background: var(--bg-card) !important;
+  background-image: none !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-color) !important;
+  box-shadow: none !important;
+  border-radius: var(--radius-sm) !important;
+}
+
+div[data-testid="stHorizontalBlock"] .stButton > button:hover {
+  border-color: var(--gemini-blue) !important;
+  background: #FFFFFF !important;
+  transform: none !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+
+/* 答题卡中当前题高亮 */
+div[data-testid="stHorizontalBlock"] .stButton > button[kind="primary"],
+div[data-testid="stHorizontalBlock"] .stButton > button[data-testid="stBaseButton-primary"] {
+  background: var(--gemini-blue) !important;
+  background-image: none !important;
+  color: #FFFFFF !important;
+  border-color: var(--gemini-blue) !important;
+}
+
+/* 标题样式统一 */
+h3, .stMarkdown h3 {
+  font-family: var(--font-sans) !important;
+  font-weight: 500 !important;
+  color: var(--text-primary) !important;
+  letter-spacing: -0.015em;
+}
+
+h4, .stMarkdown h4 {
+  font-family: var(--font-sans) !important;
+  font-weight: 500 !important;
+  color: var(--text-primary) !important;
+}
+
+/* 链接 */
+a {
+  color: var(--gemini-blue-dark) !important;
+  text-decoration: none !important;
+  transition: color var(--duration-fast) var(--ease-out) !important;
+}
+
+a:hover {
+  color: var(--gemini-purple) !important;
+  text-decoration: underline !important;
+}
+
+/* 标签 (Radio label 文本) */
+.stMarkdown p strong {
+  font-family: var(--font-sans);
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+/* 说明卡片 (首页备考说明) */
+.q-card h3 {
+  font-family: var(--font-sans) !important;
+  font-size: 1.15rem !important;
+  font-weight: 500 !important;
+  color: var(--text-primary) !important;
+  margin-bottom: 12px !important;
+}
+
+.q-card p {
+  font-family: var(--font-text);
+  font-size: 0.925rem;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+.q-card ul {
+  padding-left: 20px;
+  line-height: 1.8;
+}
+
+.q-card li {
+  font-family: var(--font-text);
+  font-size: 0.925rem;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+
+.q-card li b {
+  font-weight: 500;
+  font-size: 0.925rem;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-primary);
+}
+
+/* 成绩报告区域特殊样式 */
+.stMarkdown h3:has(+ .stMetric) {
+  margin-bottom: 1rem;
+}
+
+/* 满分成功动效 */
+@keyframes popIn {
+  0%   { transform: scale(0.8); opacity: 0; }
+  60%  { transform: scale(1.05); }
+  100% { transform: scale(1); opacity: 1; }
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -2121,7 +2631,7 @@ else:
             # 显示解析
             st.markdown(f"""
             <div class='explanation-box'>
-                <h5 style='color:#2CBA00;margin-top:0;'>💡 Nutanix 技术架构专家解析：</h5>
+                <h5>💡 Nutanix 技术架构专家解析：</h5>
                 <p>{q_data['explanation']}</p>
             </div>
             """, unsafe_allow_html=True)
@@ -2277,7 +2787,7 @@ else:
                         # 解析
                         st.markdown(f"""
                         <div class='explanation-box' style='margin-top:5px;'>
-                            <h6 style='color:#2CBA00;margin-top:0;'>💡 Nutanix 官方技术解析：</h6>
+                            <h6>💡 Nutanix 官方技术解析：</h6>
                             <p>{w['explanation']}</p>
                         </div>
                         """, unsafe_allow_html=True)
