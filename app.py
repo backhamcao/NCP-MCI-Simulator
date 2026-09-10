@@ -2525,16 +2525,17 @@ if not st.session_state.started:
                 if question["num"] in st.session_state.wrong_question_ids
             ]
             st.session_state.selected_mode = "📝 章节练习 (Practice)"
-        elif shuffle_opt:
-            pool = list(range(len(QUESTIONS)))
-            random.shuffle(pool)
-            st.session_state.quiz_pool = pool[:num_questions]
         else:
-            # 顺序抽取指定范围的题目
-            start_idx = range_opt[0] - 1  # 题号转为 0-based 索引
-            end_idx = range_opt[1]        # range_opt[1] 是包含的
-            st.session_state.quiz_pool = list(range(start_idx, end_idx))
             st.session_state.selected_mode = mode_select
+            if shuffle_opt:
+                pool = list(range(len(QUESTIONS)))
+                random.shuffle(pool)
+                st.session_state.quiz_pool = pool[:num_questions]
+            else:
+                # 顺序抽取指定范围的题目
+                start_idx = range_opt[0] - 1  # 题号转为 0-based 索引
+                end_idx = range_opt[1]        # range_opt[1] 是包含的
+                st.session_state.quiz_pool = list(range(start_idx, end_idx))
         st.session_state.started = True
         st.session_state.current_index = 0
         st.session_state.user_answers = {}
