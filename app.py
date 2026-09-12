@@ -70,8 +70,11 @@ TRANSLATIONS = {
         "pass": "通过考试 (PASS)",
         "fail": "未通过 (FAIL) — 需加油！",
         "wrong_summary": "错题本与专家解析",
+        "wrong_summary_count": "共 {count} 道错题",
         "wrong_summary_desc": "请针对以下做错的题目进行专项深度强化复习：",
         "wrong_item_prefix": "第 {idx} 题（原卷第 {orig} 题）：",
+        "full_question": "完整问题",
+        "options_label": "选项",
         "user_answer": "您的答案：",
         "correct_answer_label": "正确答案：",
         "restart_exam": "重新开始新的考试",
@@ -144,8 +147,11 @@ TRANSLATIONS = {
         "pass": "Passed (PASS)",
         "fail": "Failed (FAIL) — keep going!",
         "wrong_summary": "Wrong-answer review and expert analysis",
+        "wrong_summary_count": "{count} incorrect questions",
         "wrong_summary_desc": "Please review the following incorrect questions and strengthen those areas:",
         "wrong_item_prefix": "Question {idx} (Original question {orig}):",
+        "full_question": "Full question",
+        "options_label": "Options",
         "user_answer": "Your answer:",
         "correct_answer_label": "Correct answer:",
         "restart_exam": "Start a new exam",
@@ -2909,21 +2915,23 @@ else:
             
             # 如果有错题，展示错题汇总和解析
             if len(wrong_list) > 0:
-                st.markdown(f"### 🔍 {t('wrong_summary')} (共 {len(wrong_list)} 道错题)")
+                st.markdown(
+                  f"### 🔍 {t('wrong_summary')} ({t('wrong_summary_count', count=len(wrong_list))})"
+                )
                 st.write(t("wrong_summary_desc"))
                 
                 for w in wrong_list:
                     with st.expander(f"{t('wrong_item_prefix', idx=w['num_label'], orig=w['orig_num'])}{w['question'][:80]}...", expanded=True):
-                        st.markdown(f"**[完整问题]** {w['question']}")
-                        st.write("**[选项]**")
+                        st.markdown(f"**[{t('full_question')}]** {w['question']}")
+                        st.write(f"**[{t('options_label')}]**")
                         for opt in w['options']:
                             st.write(f"- {opt}")
-                            
+
                         # 用户选择与正确答案
                         w_col1, w_col2 = st.columns(2)
                         w_col1.markdown(f"❌ **{t('user_answer')}** `{w['user_ans']}`")
                         w_col2.markdown(f"✔ **{t('correct_answer_label')}** `{w['correct_ans']}`")
-                        
+
                         # 解析
                         st.markdown(f"""
                         <div class='explanation-box' style='margin-top:5px;'>
