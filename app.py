@@ -2,65 +2,195 @@ import streamlit as st
 import json
 import random
 
-# Set Page Config
+# Set Page Config. The language is stored in Session State, so the browser tab
+# title follows the selected language on every Streamlit rerun.
+page_titles = {
+  "en": "Nutanix NCP-MCI v6.10 Exam Simulator",
+  "zh": "Nutanix NCP-MCI v6.10 考试模拟器",
+}
 st.set_page_config(
-    page_title="Nutanix NCP-MCI v6.10 备考模拟系统",
-    page_icon="🟢",
-    layout="wide"
+  page_title=page_titles.get(st.session_state.get("lang", "en"), page_titles["en"]),
+  page_icon="🟢",
+  layout="wide"
 )
+
+TRANSLATIONS = {
+    "zh": {
+        "app_title": "Nutanix NCP-MCI v6.10 考试模拟器",
+        "app_subtitle": "Nutanix Certified Professional - Multicloud Infrastructure 个人备考系统",
+        "simulator_control": "模拟器控制栏",
+        "current_mode": "当前模式：",
+        "exit_reset": "退出并重置系统",
+        "study_guide": "备考系统说明",
+        "study_guide_desc": "此模拟网页包含 102 道真实技术考题、高亮答案与深度技术架构解析。本系统提供以下两种学习模式：",
+        "practice_mode": "章节练习 (Practice)",
+        "mock_mode": "模拟考试 (Mock Exam)",
+        "practice_desc": "逐题进行练习。每答完一题即可提交并查看该题的正确答案及详细技术分析，适合边学边背、查漏补缺。",
+        "mock_desc": "在无即时反馈的环境下一次性完成所有题目，答题结束后统一提交。系统会自动打分并为您归纳出所有错题汇总与深度技术解析。",
+        "start_hint": "请在下方完成配置并点击【🚀 启动模拟系统】开始备考！",
+        "setup_title": "系统初始化配置",
+        "mode_select_label": "选择答题模式",
+        "mode_help": "章节练习：做一题对一题并即时展示官方技术解析。模拟考试：在无即时反馈下连续答题，提交后统一生成错题本。",
+        "shuffle_label": "随机打乱题目顺序",
+        "shuffle_help": "开启：打乱并随机抽取指定数量的题；关闭：可自定义选择顺序练习的题号区间（例如刷第20-50题，系统已自动定位您上次的进度）。",
+        "num_questions_label": "随机抽取题目数量",
+        "num_questions_help": "默认抽取 20 道题，您可自由拖动滑块至最多 102 道全套题。",
+        "range_start_label": "起始题号",
+        "range_end_label": "结束题号",
+        "range_prompt": "请输入顺序练习的起始题号。",
+        "range_end_prompt": "请输入顺序练习的结束题号。",
+        "range_slider_label": "选择顺序练习的题号范围（从第几题到第几题）",
+        "range_slider_help": "指定您要按顺序练习的题号区间。系统已为您自动将起点设为上次结束进度：第 {default_start} 题。",
+        "range_error_empty": "起始题号和结束题号不能为空。",
+        "range_error_digit": "题号只能输入数字。",
+        "range_error_bounds": "题号必须在 1 到 {len_questions} 之间。",
+        "range_error_order": "起始题号不能大于结束题号。",
+        "wrong_count": "当前错题本共有 {count} 道题。错题记录保存在本浏览器中。",
+        "practice_wrong_btn": "练习错题",
+        "clear_wrong_btn": "清空错题本",
+        "clear_wrong_done": "错题本已清空。",
+        "start_exam_btn": "启动模拟系统",
+        "reset_progress_btn": "清除历史进度 (从第 1 题重新开始)",
+        "reset_progress_done": "历史进度已清除，已恢复至第 1 题！",
+        "quiz_pool_start": "题目池",
+        "section_practice": "章节练习",
+        "preview_label": "请选择您的答案：",
+        "choose_two_hint": "(Choose two 为多选题)",
+        "submit_btn": "提交并查看解析",
+        "correct_answer": "恭喜！回答正确！(正确答案：{answer})",
+        "wrong_answer": "回答错误。您的选择：{user} | 正确答案：{answer}",
+        "analysis_title": "Nutanix 技术架构专家解析：",
+        "prev_question": "上一题",
+        "next_question": "下一题",
+        "submit_paper": "提交试卷",
+        "answer_sheet": "答题卡快速跳转",
+        "score_report": "模拟考试成绩报告",
+        "correct_count": "答对题数",
+        "score_rate": "得分率",
+        "pass": "通过考试 (PASS)",
+        "fail": "未通过 (FAIL) — 需加油！",
+        "wrong_summary": "错题本与专家解析",
+        "wrong_summary_desc": "请针对以下做错的题目进行专项深度强化复习：",
+        "wrong_item_prefix": "第 {idx} 题（原卷第 {orig} 题）：",
+        "user_answer": "您的答案：",
+        "correct_answer_label": "正确答案：",
+        "restart_exam": "重新开始新的考试",
+        "toggle_language": "English / 中文",
+        "language_label": "语言",
+        "mode_practice": "章节练习",
+        "mode_mock": "模拟考试",
+        "current_progress": "当前进度：",
+        "q_count_suffix": "题",
+        "choose_answer": "请选择：",
+        "unanswered": "未作答",
+        "ncp_expert_analysis": "Nutanix 官方技术解析：",
+        "start_exam_short": "启动模拟系统 (Start Exam)",
+        "empty_wrong_book": "当前错题本为空。",
+        "pass_all": "太不可思议了！您完成了满分答卷！100% 正确！已完美掌握该阶段所有考点。",
+        "other_answer": "其他答案"
+    },
+    "en": {
+        "app_title": "Nutanix NCP-MCI v6.10 Exam Simulator",
+        "app_subtitle": "Nutanix Certified Professional - Multicloud Infrastructure Practice System",
+        "simulator_control": "Simulator Controls",
+        "current_mode": "Current mode: ",
+        "exit_reset": "Exit and Reset System",
+        "study_guide": "Study Guide",
+        "study_guide_desc": "This mock exam includes 102 real technical questions, highlighted answers, and expert architecture analysis. The system provides two learning modes:",
+        "practice_mode": "Practice Mode",
+        "mock_mode": "Mock Exam Mode",
+        "practice_desc": "Practice question by question. After each answer, you can submit and review the correct option and detailed technical analysis, ideal for incremental learning and identifying gaps.",
+        "mock_desc": "Answer the full set without instant feedback, then submit the exam at the end. The system automatically grades the test and summarizes all incorrect answers with deep technical analysis.",
+        "start_hint": "Please complete the setup below and click the button below to start your preparation!",
+        "setup_title": "Step 1: System Initialization",
+        "mode_select_label": "Select exam mode",
+        "mode_help": "Practice mode: answer one question at a time and see the official technical analysis immediately. Mock exam mode: answer the whole set without feedback, then review the wrong-answer summary after submission.",
+        "shuffle_label": "Shuffle question order",
+        "shuffle_help": "On: shuffle and randomly select a set of questions. Off: choose a custom sequence range (for example, questions 20-50, and the system will resume from your last saved progress).",
+        "num_questions_label": "Number of questions to draw",
+        "num_questions_help": "Default: 20 questions. You may drag the slider up to all 102 questions.",
+        "range_start_label": "Start question number",
+        "range_end_label": "End question number",
+        "range_prompt": "Please enter the start question number.",
+        "range_end_prompt": "Please enter the end question number.",
+        "range_slider_label": "Select practice range (from question X to question Y)",
+        "range_slider_help": "Specify the question range for sequential practice. The system has automatically set the start point to your last progress: question {default_start}.",
+        "range_error_empty": "Start and end question numbers cannot be empty.",
+        "range_error_digit": "Question numbers must be numeric.",
+        "range_error_bounds": "Question numbers must be between 1 and {len_questions}.",
+        "range_error_order": "Start question number cannot be greater than the end question number.",
+        "wrong_count": "There are currently {count} questions in your wrong-answer book. The record is stored in this browser.",
+        "practice_wrong_btn": "Practice wrong answers",
+        "clear_wrong_btn": "Clear wrong-answer book",
+        "clear_wrong_done": "The wrong-answer book has been cleared.",
+        "start_exam_btn": "Start exam",
+        "reset_progress_btn": "Clear progress (start from question 1)",
+        "reset_progress_done": "Progress has been cleared and the exam has been reset to question 1.",
+        "quiz_pool_start": "Question pool",
+        "section_practice": "Practice",
+        "preview_label": "Please select your answer:",
+        "choose_two_hint": "(Choose two for multi-select)",
+        "submit_btn": "Submit and view explanation",
+        "correct_answer": "Correct! The answer is {answer}",
+        "wrong_answer": "Incorrect. Your selection: {user} | Correct answer: {answer}",
+        "analysis_title": "Expert technical analysis:",
+        "prev_question": "Previous",
+        "next_question": "Next",
+        "submit_paper": "Submit paper",
+        "answer_sheet": "Answer Sheet Jump",
+        "score_report": "Exam Score Report",
+        "correct_count": "Correct answers",
+        "score_rate": "Score rate",
+        "pass": "Passed (PASS)",
+        "fail": "Failed (FAIL) — keep going!",
+        "wrong_summary": "Wrong-answer review and expert analysis",
+        "wrong_summary_desc": "Please review the following incorrect questions and strengthen those areas:",
+        "wrong_item_prefix": "Question {idx} (Original question {orig}):",
+        "user_answer": "Your answer:",
+        "correct_answer_label": "Correct answer:",
+        "restart_exam": "Start a new exam",
+        "toggle_language": "English / 中文",
+        "language_label": "Language",
+        "mode_practice": "Practice",
+        "mode_mock": "Mock Exam",
+        "current_progress": "Current progress:",
+        "q_count_suffix": "questions",
+        "choose_answer": "Please choose:",
+        "unanswered": "Unanswered",
+        "ncp_expert_analysis": "Nutanix official technical analysis:",
+        "start_exam_short": "Start Exam",
+        "empty_wrong_book": "The wrong-answer book is empty.",
+        "pass_all": "Incredible! You scored a perfect 100% and mastered every knowledge point in this section.",
+        "other_answer": "Other answers"
+    }
+}
+
+
+def t(key, **kwargs):
+    lang = st.session_state.get("lang", "en")
+    values = TRANSLATIONS.get(lang, TRANSLATIONS["en"])
+    text = values.get(key, key)
+    return text.format(**kwargs) if kwargs else text
+
+
+def mode_label(mode):
+    return t("practice_mode") if mode == "practice" else t("mock_mode")
+
+
+def nav_button(label, key, disabled=False, is_primary=False):
+    return st.button(
+        label,
+        key=key,
+        type="primary" if is_primary else "secondary",
+        disabled=disabled,
+        use_container_width=True,
+    )
+
 
 # ── 数据集 (已内置 102 道真题、答案及技术解析) ──────────────────────────────
 QUESTIONS = [
   {
     "num": 1,
-    "question": "The team leads of a development environment want to limit developer access to a specific set of VMs What is the most efficient way to enable the team leads to directly manage these VMs?",
-    "options": [
-      "A. Create a Project for each team lead and assign access",
-      "B. Create Security Policies to isolate users",
-      "C. Create a VPC for each team lead and give them VPC Admin",
-      "D. Create a role mapping for each team lead and assign appropriately"
-    ],
-    "answer": "A",
-    "explanation": "Nutanix Projects in Prism Central provide a robust multi-tenant environment. By creating a Project for each team lead and assigning access, administrators can delegate direct management of a specific set of VMs to those team leads without exposing other project workloads.",
-    "answer_clean": [
-      "A"
-    ],
-    "is_multi": False
-  },
-  {
-    "num": 2,
-    "question": "What is supported for creating a VM Template?",
-    "options": [
-      "A. VM has disks located on RF2 containers",
-      "B. VM is an agent or a Prism Central VM",
-      "C. VM is protected by Protection Domain-based DR",
-      "D. VM runs on the ESXi hypervisor"
-    ],
-    "answer": "A",
-    "explanation": "Creating a VM template requires that the source VM's disks be placed on a storage container with a Replication Factor of 2 (RF2) or higher to ensure redundancy. Agent VMs, Prism Central VMs, and direct ESXi-managed VMs are not supported.",
-    "answer_clean": [
-      "A"
-    ],
-    "is_multi": False
-  },
-  {
-    "num": 3,
-    "question": "How can a VM of Volume Group (VG) be associated to a Storage Policy?",
-    "options": [
-      "A. Assign the Storage Policy directly on the VM or VG",
-      "B. Assign the VM or VG directly on the Storage Policy",
-      "C. Migrate the VM or VG to the Storage Container assigned to the Storage Policy",
-      "D. Assign the VM or VG to the same Category as the Storage Policy"
-    ],
-    "answer": "D",
-    "explanation": "Nutanix Storage Policies are applied at scale by leveraging Categories. Associating a VM or Volume Group (VG) with the target category instantly applies the rules managed by that Storage Policy.",
-    "answer_clean": [
-      "D"
-    ],
-    "is_multi": False
-  },
-  {
-    "num": 4,
     "question": "What can be used to easily group a set of VMs?",
     "options": [
       "A. Labels",
@@ -2101,7 +2231,7 @@ div[data-testid="stHorizontalBlock"] .stButton > button[kind="secondary"],
 div[data-testid="stHorizontalBlock"] .stButton > button[data-testid="stBaseButton-primary"],
 div[data-testid="stHorizontalBlock"] .stButton > button[data-testid="stBaseButton-secondary"] {
   min-width: 42px !important;
-  padding: 8px 4px !important;
+  padding: 8px 10px !important;
   font-size: 0.825rem !important;
   font-weight: 500 !important;
   background: var(--bg-card) !important;
@@ -2109,7 +2239,7 @@ div[data-testid="stHorizontalBlock"] .stButton > button[data-testid="stBaseButto
   color: var(--text-primary) !important;
   border: 1px solid var(--border-color) !important;
   box-shadow: none !important;
-  border-radius: var(--radius-sm) !important;
+  border-radius: var(--radius-pill) !important;
 }
 
 div[data-testid="stHorizontalBlock"] .stButton > button:hover {
@@ -2227,7 +2357,9 @@ if 'score' not in st.session_state:
 if 'practice_answered' not in st.session_state:
     st.session_state.practice_answered = set() # Set of indices answered in practice mode
 if 'selected_mode' not in st.session_state:
-    st.session_state.selected_mode = "📝 章节练习 (Practice)"
+    st.session_state.selected_mode = "practice"
+if 'lang' not in st.session_state:
+    st.session_state.lang = "en"
 
 # 🆕 自动化 LocalStorage 双向同步组件 (100% 免疫 CORS 与 Iframe 沙箱限制)
 import streamlit.components.v1 as components_v8
@@ -2364,14 +2496,20 @@ except Exception as e:
     pass
 
 # ── 导航与页面布局 ────────────────────────────────────────────────────────
-st.markdown("<h1 class='main-header'>🟢 Nutanix NCP-MCI v6.10 考试模拟器</h1>", unsafe_allow_html=True)
-st.markdown("<h4 class='sub-header'>Nutanix Certified Professional - Multicloud Infrastructure 个人备考系统</h4>", unsafe_allow_html=True)
+header_col, lang_col = st.columns([7, 1])
+with header_col:
+    st.markdown(f"<h1 class='main-header'>🟢 {t('app_title')}</h1>", unsafe_allow_html=True)
+    st.markdown(f"<h4 class='sub-header'>{t('app_subtitle')}</h4>", unsafe_allow_html=True)
+with lang_col:
+    if st.button("EN / 中", use_container_width=False):
+        st.session_state.lang = "en" if st.session_state.get("lang", "en") == "zh" else "zh"
+        st.rerun()
 
 # ── 侧边栏设置 (仅在系统开始后作为一个快速控制和退出/重置区，避免配置功能在小屏幕下折叠找不到) ─────────────────
 if st.session_state.started:
-    st.sidebar.header("⚙️ 模拟器控制栏")
-    st.sidebar.markdown(f"**当前模式：** {st.session_state.selected_mode}")
-    if st.sidebar.button("🔄 退出并重置系统", use_container_width=True):
+    st.sidebar.header(f"⚙️ {t('simulator_control')}")
+    st.sidebar.markdown(f"**{t('current_mode')}** {mode_label(st.session_state.selected_mode)}")
+    if st.sidebar.button(f"🔄 {t('exit_reset')}", use_container_width=True):
         st.session_state.started = False
         st.session_state.submitted = False
         st.rerun()
@@ -2379,40 +2517,41 @@ if st.session_state.started:
 # ── 主体渲染 ─────────────────────────────────────────────────────────────
 if not st.session_state.started:
     # 1. 考试说明卡片
-    st.markdown("""
+    st.markdown(f"""
     <div class='q-card'>
-        <h3>💡 备考系统说明</h3>
-        <p>此模拟网页基于您的 NCP-MCI v6.10 PDF 题库开发，包含 102 道真实技术考题、高亮答案与深度技术架构解析。本系统提供以下两种学习模式：</p>
+        <h3>💡 {t('study_guide')}</h3>
+        <p>{t('study_guide_desc')}</p>
         <ul>
-            <li><b>📝 章节练习模式 (Practice Mode)：</b>逐题进行练习。每答完一题即可提交并查看该题的正确答案及详细技术分析，适合边学边背、查漏补缺。</li>
-            <li><b>🏆 模拟考试模式 (Mock Exam Mode)：</b>在无即时反馈的环境下一次性完成所有题目，答题结束后统一提交。系统会自动打分并为您归纳出所有<b>错题汇总与深度技术解析</b>。</li>
+            <li><b>📝 {t('practice_mode')}：</b>{t('practice_desc')}</li>
+            <li><b>🏆 {t('mock_mode')}：</b>{t('mock_desc')}</li>
         </ul>
-        <p><i>请在下方完成配置并点击【🚀 启动模拟系统】开始备考！</i></p>
+        <p><i>{t('start_hint')}</i></p>
     </div>
     """, unsafe_allow_html=True)
     
     # 2. 将配置选项直接放在主页中心，防止移动端或窄屏下 sidebar 折叠导致用户找不到！
-    st.markdown("### 🛠️ 第一步：系统初始化配置")
+    st.markdown(f"### 🛠️ {t('setup_title')}")
     setup_col1, setup_col2 = st.columns(2)
     with setup_col1:
         mode_select = st.radio(
-            "📚 选择答题模式", 
-            ["📝 章节练习 (Practice)", "🏆 模拟考试 (Mock Exam)"],
-            help="章节练习：做一题对一题并即时展示官方技术解析。模拟考试：在无即时反馈下连续答题，提交后统一生成错题本。"
+            t("mode_select_label"),
+            ["practice", "mock"],
+            format_func=lambda value: t("practice_mode") if value == "practice" else t("mock_mode"),
+            help=t("mode_help")
         )
     with setup_col2:
         shuffle_opt = st.checkbox(
-            "🔀 随机打乱题目顺序", 
-            value=True, 
-            help="开启：打乱并随机抽取指定数量的题；关闭：可自定义选择顺序练习的题号区间（例如刷第20-50题，系统已自动定位您上次的进度）。"
+            t("shuffle_label"),
+            value=True,
+            help=t("shuffle_help")
         )
         if shuffle_opt:
             num_questions = st.slider(
-                "❓ 随机抽取题目数量", 
-                min_value=5, 
-                max_value=len(QUESTIONS), 
-                value=20, 
-                help="默认抽取 20 道题，您可自由拖动滑块至最多 102 道全套题。"
+                t("num_questions_label"),
+                min_value=5,
+                max_value=len(QUESTIONS),
+                value=20,
+                help=t("num_questions_help")
             )
             range_opt = None
         else:
@@ -2433,44 +2572,44 @@ if not st.session_state.started:
             range_input_col1, range_input_col2 = st.columns(2)
             with range_input_col1:
                 st.text_input(
-                    "🎯 起始题号",
+                    t("range_start_label"),
                     key="range_start_input",
-                  on_change=sync_range_from_inputs,
-                    help="请输入顺序练习的起始题号。"
+                    on_change=sync_range_from_inputs,
+                    help=t("range_prompt")
                 )
             with range_input_col2:
                 st.text_input(
-                    "🏁 结束题号",
+                    t("range_end_label"),
                     key="range_end_input",
-                  on_change=sync_range_from_inputs,
-                    help="请输入顺序练习的结束题号。"
+                    on_change=sync_range_from_inputs,
+                    help=t("range_end_prompt")
                 )
 
             range_opt = st.slider(
-                "🎯 选择顺序练习的题号范围（从第几题到第几题）",
+                t("range_slider_label"),
                 min_value=1,
                 max_value=len(QUESTIONS),
                 value=st.session_state.range_slider,
                 step=1,
                 key="range_slider",
                 on_change=sync_inputs_from_range,
-                help=f"指定您要按顺序练习的题号区间。系统已为您自动将起点设为上次结束进度：第 {default_start} 题。"
+                help=t("range_slider_help", default_start=default_start)
             )
 
             range_start = st.session_state.get("range_start_input")
             range_end = st.session_state.get("range_end_input")
             range_error = None
             if not range_start or not range_end:
-                range_error = "起始题号和结束题号不能为空。"
+                range_error = t("range_error_empty")
             elif not range_start.isdigit() or not range_end.isdigit():
-                range_error = "题号只能输入数字。"
+                range_error = t("range_error_digit")
             else:
                 range_start = int(range_start)
                 range_end = int(range_end)
             if range_error is None and (not 1 <= range_start <= len(QUESTIONS) or not 1 <= range_end <= len(QUESTIONS)):
-                range_error = f"题号必须在 1 到 {len(QUESTIONS)} 之间。"
+                range_error = t("range_error_bounds", len_questions=len(QUESTIONS))
             elif range_error is None and range_start > range_end:
-                range_error = "起始题号不能大于结束题号。"
+                range_error = t("range_error_order")
 
             if range_error:
               st.warning(f"⚠️ {range_error}")
@@ -2483,25 +2622,25 @@ if not st.session_state.started:
     st.markdown("---")
     wrong_count = len(st.session_state.wrong_question_ids)
     if wrong_count:
-      st.info(f"📚 当前错题本共有 {wrong_count} 道题。错题记录保存在本浏览器中。")
+      st.info(t("wrong_count", count=wrong_count))
       wrong_col1, wrong_col2 = st.columns([2, 1])
       with wrong_col1:
         wrong_practice_btn = st.button(
-          "🎯 练习错题",
+          t("practice_wrong_btn"),
           type="secondary",
           use_container_width=True,
         )
       with wrong_col2:
-        clear_wrong_btn = st.button("🧹 清空错题本", use_container_width=True)
+        clear_wrong_btn = st.button(t("clear_wrong_btn"), use_container_width=True)
       if clear_wrong_btn:
         clear_wrong_questions()
-        st.success("错题本已清空。")
+        st.success(t("clear_wrong_done"))
         st.rerun()
     else:
       wrong_practice_btn = False
 
     start_btn = st.button(
-      "🚀 启动模拟系统 (Start Exam)",
+      t("start_exam_btn"),
       type="primary",
       use_container_width=True,
       disabled=not shuffle_opt and range_opt is None,
@@ -2510,11 +2649,11 @@ if not st.session_state.started:
     # 🆕 清除进度交互按钮
     if st.session_state.get("last_saved_progress", 1) > 1:
         st.write("")
-        reset_progress_btn = st.button("🧹 清除历史进度 (从第 1 题重新开始)", use_container_width=True)
+        reset_progress_btn = st.button(t("reset_progress_btn"), use_container_width=True)
         if reset_progress_btn:
             st.session_state.last_saved_progress = 1
             st.session_state.progress_to_save = "1"
-            st.success("历史进度已清除，已恢复至第 1 题！")
+            st.success(t("reset_progress_done"))
             st.rerun()
             
     if start_btn or wrong_practice_btn:
@@ -2524,7 +2663,7 @@ if not st.session_state.started:
                 index for index, question in enumerate(QUESTIONS)
                 if question["num"] in st.session_state.wrong_question_ids
             ]
-            st.session_state.selected_mode = "📝 章节练习 (Practice)"
+            st.session_state.selected_mode = "practice"
         else:
             st.session_state.selected_mode = mode_select
             if shuffle_opt:
@@ -2553,15 +2692,15 @@ else:
     total_q = len(pool_indices)
     curr_num = st.session_state.current_index + 1
     
-    st.sidebar.markdown(f"**当前进度：** {curr_num} / {total_q} 题")
+    st.sidebar.markdown(f"**{t('current_progress')}** {curr_num} / {total_q} {t('q_count_suffix')}")
     st.sidebar.progress(curr_num / total_q)
     
-    if mode == "📝 章节练习 (Practice)":
+    if mode == "practice":
         # ── 练习模式 (逐题反馈) ──────────────────────────────────────────
-        st.markdown(f"### 第 {curr_num} 题 / 共 {total_q} 题")
+        st.markdown(f"### {curr_num} / {total_q} {t('q_count_suffix')}")
         
         # 渲染题目内容
-        st.markdown(f"<div class='q-card'><b>[题目]</b> {q_data['question']}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='q-card'><b>[{t('quiz_pool_start')}]</b> {q_data['question']}</div>", unsafe_allow_html=True)
         
         # 解析选项
         options_list = q_data['options']
@@ -2570,7 +2709,7 @@ else:
         is_multi = q_data['is_multi']
         
         # 答题交互
-        st.write("**请选择您的答案：** (Choose two 为多选题)" if is_multi else "**请选择您的答案：**")
+        st.write(f"**{t('preview_label')}** {t('choose_two_hint')}" if is_multi else f"**{t('preview_label')}**")
         
         # 获取之前保存的答案
         saved_ans = st.session_state.user_answers.get(st.session_state.current_index, [])
@@ -2593,7 +2732,7 @@ else:
                         break
             
             choice = st.radio(
-                "请选择：", 
+                t("choose_answer"), 
                 options_list, 
                 index=default_idx if default_idx is not None else 0,
                 label_visibility="collapsed",
@@ -2609,7 +2748,7 @@ else:
         
         col1, col2 = st.columns([1, 4])
         with col1:
-            submit_btn = st.button("🗳️ 提交并查看解析", disabled=is_answered, use_container_width=True)
+            submit_btn = st.button(t("submit_btn"), disabled=is_answered, use_container_width=True)
             
         if submit_btn or is_answered:
             st.session_state.practice_answered.add(st.session_state.current_index)
@@ -2623,16 +2762,16 @@ else:
             correct_str = ", ".join(q_data['answer_clean'])
             
             if user_set == correct_set:
-                st.success(f"🎉 恭喜！回答正确！(正确答案：{correct_str})")
+                st.success(t("correct_answer", answer=correct_str))
             else:
                 queue_wrong_question(q_data["num"])
-                user_str = ", ".join(user_set) if user_set else "未作答"
-                st.error(f"❌ 回答错误。您的选择：{user_str} | 正确答案：{correct_str}")
+                user_str = ", ".join(user_set) if user_set else t("unanswered")
+                st.error(t("wrong_answer", user=user_str, answer=correct_str))
                 
             # 显示解析
             st.markdown(f"""
             <div class='explanation-box'>
-                <h5>💡 Nutanix 技术架构专家解析：</h5>
+                <h5>💡 {t('analysis_title')}</h5>
                 <p>{q_data['explanation']}</p>
             </div>
             """, unsafe_allow_html=True)
@@ -2641,11 +2780,11 @@ else:
         st.write("---")
         nav_col1, nav_col2, nav_col3 = st.columns([1, 1, 3])
         with nav_col1:
-            if st.button("⬅️ 上一题", disabled=st.session_state.current_index == 0, use_container_width=True):
+            if nav_button(f"⬅️ {t('prev_question')}", key=f"nav_prev_{st.session_state.current_index}", disabled=st.session_state.current_index == 0):
                 st.session_state.current_index -= 1
                 st.rerun()
         with nav_col2:
-            if st.button("下一题 ➡️", disabled=st.session_state.current_index == total_q - 1, use_container_width=True):
+            if nav_button(f"{t('next_question')} ➡️", key=f"nav_next_{st.session_state.current_index}", disabled=st.session_state.current_index == total_q - 1):
                 if not st.session_state.current_index in st.session_state.practice_answered:
                     st.session_state.practice_answered.add(st.session_state.current_index)
                 if not st.session_state.get("shuffle_opt", True):
@@ -2653,17 +2792,17 @@ else:
                 st.session_state.current_index += 1
                 st.rerun()
                 
-    elif mode == "🏆 模拟考试 (Mock Exam)":
+    elif mode == "mock":
         # ── 模拟考试模式 (统一交卷) ──────────────────────────────────────
         if not st.session_state.submitted:
-            st.markdown(f"### 第 {curr_num} 题 / 共 {total_q} 题")
-            st.markdown(f"<div class='q-card'><b>[题目]</b> {q_data['question']}</div>", unsafe_allow_html=True)
+            st.markdown(f"### {curr_num} / {total_q} {t('q_count_suffix')}")
+            st.markdown(f"<div class='q-card'><b>[{t('quiz_pool_start')}]</b> {q_data['question']}</div>", unsafe_allow_html=True)
             
             options_list = q_data['options']
             user_sel = []
             is_multi = q_data['is_multi']
             
-            st.write("**请选择您的答案：** (Choose two 为多选题)" if is_multi else "**请选择您的答案：**")
+            st.write(f"**{t('preview_label')}** {t('choose_two_hint')}" if is_multi else f"**{t('preview_label')}**")
             
             # 获取已经保存的值
             saved_ans = st.session_state.user_answers.get(st.session_state.current_index, [])
@@ -2683,7 +2822,7 @@ else:
                             default_idx = idx
                             break
                 choice = st.radio(
-                    "请选择：", 
+                    t("choose_answer"), 
                     options_list, 
                     index=default_idx if default_idx is not None else 0,
                     label_visibility="collapsed",
@@ -2697,22 +2836,22 @@ else:
             st.write("---")
             nav_col1, nav_col2, nav_col3 = st.columns([1, 1, 3])
             with nav_col1:
-                if st.button("⬅️ 上一题", disabled=st.session_state.current_index == 0, use_container_width=True):
+                if nav_button(f"⬅️ {t('prev_question')}", key=f"exam_nav_prev_{st.session_state.current_index}", disabled=st.session_state.current_index == 0):
                     st.session_state.current_index -= 1
                     st.rerun()
             with nav_col2:
                 if st.session_state.current_index == total_q - 1:
-                    submit_exam = st.button("🏁 提交试卷", type="primary", use_container_width=True)
+                    submit_exam = st.button(t("submit_paper"), type="primary", use_container_width=True)
                     if submit_exam:
                         st.session_state.submitted = True
                         st.rerun()
                 else:
-                    if st.button("下一题 ➡️", use_container_width=True):
+                    if nav_button(f"{t('next_question')} ➡️", key=f"exam_nav_next_{st.session_state.current_index}"):
                         st.session_state.current_index += 1
                         st.rerun()
                         
             # 答题导航快速面板
-            st.markdown("### 🗺️ 答题卡快速跳转")
+            st.markdown(f"### 🗺️ {t('answer_sheet')}")
             cols = st.columns(10)
             for idx, q_idx in enumerate(pool_indices):
                 col_i = idx % 10
@@ -2728,7 +2867,7 @@ else:
                     st.rerun()
         else:
             # ── 提交后的成绩结算页面 ──────────────────────────────────────────
-            st.markdown("### 📊 模拟考试成绩报告")
+            st.markdown(f"### 📊 {t('score_report')}")
             
             # 计算总得分
             correct_count = 0
@@ -2748,7 +2887,7 @@ else:
                         "orig_num": orig_q['num'],
                         "question": orig_q['question'],
                         "options": orig_q['options'],
-                        "user_ans": ", ".join(user_ans) if user_ans else "未答",
+                        "user_ans": ", ".join(user_ans) if user_ans else t("unanswered"),
                         "correct_ans": ", ".join(correct_ans),
                         "explanation": orig_q['explanation']
                     })
@@ -2757,24 +2896,24 @@ else:
             
             # 显示看板
             col_m1, col_m2, col_m3 = st.columns(3)
-            col_m1.metric("答对题数", f"{correct_count} / {total_q} 题")
-            col_m2.metric("得分率", f"{score_pct:.1f}%")
+            col_m1.metric(t("correct_count"), f"{correct_count} / {total_q} {t('q_count_suffix')}")
+            col_m2.metric(t("score_rate"), f"{score_pct:.1f}%")
             
             is_passed = score_pct >= 50.0
             if is_passed:
-                col_m3.success("🏆 通过考试 (PASS)")
+                col_m3.success(f"🏆 {t('pass')}")
             else:
-                col_m3.error("❌ 未通过 (FAIL) — 需加油！")
+                col_m3.error(f"❌ {t('fail')}")
                 
             st.markdown("---")
             
             # 如果有错题，展示错题汇总和解析
             if len(wrong_list) > 0:
-                st.markdown(f"### 🔍 错题本与专家解析 (共 {len(wrong_list)} 道错题)")
-                st.write("请针对以下做错的题目进行专项深度强化复习：")
+                st.markdown(f"### 🔍 {t('wrong_summary')} (共 {len(wrong_list)} 道错题)")
+                st.write(t("wrong_summary_desc"))
                 
                 for w in wrong_list:
-                    with st.expander(f"第 {w['num_label']} 题（原卷第 {w['orig_num']} 题）：{w['question'][:80]}...", expanded=True):
+                    with st.expander(f"{t('wrong_item_prefix', idx=w['num_label'], orig=w['orig_num'])}{w['question'][:80]}...", expanded=True):
                         st.markdown(f"**[完整问题]** {w['question']}")
                         st.write("**[选项]**")
                         for opt in w['options']:
@@ -2782,22 +2921,22 @@ else:
                             
                         # 用户选择与正确答案
                         w_col1, w_col2 = st.columns(2)
-                        w_col1.markdown(f"❌ **您的答案：** `{w['user_ans']}`")
-                        w_col2.markdown(f"✔ **正确答案：** `{w['correct_ans']}`")
+                        w_col1.markdown(f"❌ **{t('user_answer')}** `{w['user_ans']}`")
+                        w_col2.markdown(f"✔ **{t('correct_answer_label')}** `{w['correct_ans']}`")
                         
                         # 解析
                         st.markdown(f"""
                         <div class='explanation-box' style='margin-top:5px;'>
-                            <h6>💡 Nutanix 官方技术解析：</h6>
+                            <h6>💡 {t('ncp_expert_analysis')}</h6>
                             <p>{w['explanation']}</p>
                         </div>
                         """, unsafe_allow_html=True)
             else:
                 st.balloons()
-                st.success("🎉 太不可思议了！您完成了满分答卷！100% 正确！已完美掌握该阶段所有考点。")
+                st.success(t("pass_all"))
                 
             # 重新开始
-            if st.button("🔄 重新开始新的考试", type="primary"):
+            if st.button(f"🔄 {t('restart_exam')}", type="primary"):
                 st.session_state.started = False
                 st.session_state.submitted = False
                 st.rerun()
